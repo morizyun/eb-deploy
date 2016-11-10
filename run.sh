@@ -24,6 +24,10 @@ if [ ! -n "$WERCKER_EB_DEPLOY_REGION" ]; then
   exit 1
 fi
 
+if [ ! -n "$WERCKER_EB_DEPLOY_PLATFORM" ]; then
+  export WERCKER_EB_DEPLOY_PLATFORM='64bit Amazon Linux 2016.03 v2.1.6 running Ruby 2.3 (Puma)'
+fi
+
 info 'Installing pip...'
 sudo apt-get update
 sudo apt-get install -y python-pip libpython-all-dev zip
@@ -41,5 +45,40 @@ export AWS_DEFAULT_REGION=$WERCKER_EB_DEPLOY_REGION
 export AWS_CONFIG_FILE=$WERCKER_ROOT/.aws/config
 
 git add .
-eb init $AWS_APPLICATION
-eb deploy $AWS_ENVIRONMENT --region $AWS_DEFAULT_REGION --staged --verbose
+
+mkdir -p "$WERCKER_SOURCE_DIR/.elasticbeanstalk/"
+cat > $WERCKER_SOURCE_DIR/.elasticbeanstalk/config.yml << EOF
+branch-defaults:
+  $WERCKER_GIT_BRANCH:
+    environment: $WERCKER_EBDEPLOY_ENVIRONMENT
+global:
+  application_name: $WERCKER_EBDEPLOY_APPLICATION
+  default_region: $WERCKER_EBDEPLOY_REGION
+  profile: null
+  sc: git
+branch-defaults:
+  ebextensions:
+    environment: $WERCKER_EBDEPLOY_ENVIRONMENT
+  master:
+    environment: $WERCKER_EBDEPLOY_ENVIRONMENT
+  seo_tags:
+    environment: $WERCKER_EBDEPLOY_ENVIRONMENT
+global:
+  application_name: $WERCKER_EBDEPLOY_APPLICATION
+  default_ec2_keyname: aws-eb.$WERCKER_EBDEPLOY_APPLICATION
+  default_platform: $WERCKER_EB_DEPLOY_PLATFORM
+  default_region: $WERCKER_EBDEPLOY_REGION
+  profile: eb-cli
+  sc: git
+EOF
+exec 3>&1
+
+for((i=0; i < 10; i++)); do
+  out=$(eb deploy $WERCKER_EBDEPLOY_ENVIRONMENT --timeout 9999 --nohang | tee >(cat - >&3))
+  if [[ "$out" == *"invalid state"* ]]; then
+    echo "Retrying in 10 seconds..."
+	  sleep 10
+  else
+	  break
+  fi
+done
