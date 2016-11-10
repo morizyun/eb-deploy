@@ -49,7 +49,7 @@ info 'git add...';
 git add .
 
 info 'eb init'
-eb init $WERCKER_EBDEPLOY_APPLICATION --quit
+eb init $WERCKER_EBDEPLOY_APPLICATION --quiet
 
 info 'create .elasticbeanstalk/config.yml...';
 mkdir -p .elasticbeanstalk
