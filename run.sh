@@ -46,16 +46,8 @@ export AWS_CONFIG_FILE=$WERCKER_ROOT/.aws/config
 
 git add .
 
-mkdir -p "$WERCKER_SOURCE_DIR/.elasticbeanstalk/"
-cat > $WERCKER_SOURCE_DIR/.elasticbeanstalk/config.yml << EOF
-branch-defaults:
-  $WERCKER_GIT_BRANCH:
-    environment: $WERCKER_EBDEPLOY_ENVIRONMENT
-global:
-  application_name: $WERCKER_EBDEPLOY_APPLICATION
-  default_region: $WERCKER_EBDEPLOY_REGION
-  profile: null
-  sc: git
+mkdir -p .elasticbeanstalk
+cat > .elasticbeanstalk/config.yml << EOF
 branch-defaults:
   ebextensions:
     environment: $WERCKER_EBDEPLOY_ENVIRONMENT
