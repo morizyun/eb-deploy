@@ -37,6 +37,7 @@ pip install --upgrade --user awsebcli
 export PATH=~/.local/bin:$PATH
 eb --version
 
+info 'export ENV VAR...';
 export AWS_ACCESS_KEY_ID=$WERCKER_EB_DEPLOY_ACCESS_KEY
 export AWS_SECRET_ACCESS_KEY=$WERCKER_EB_DEPLOY_SECRET_KEY
 export AWS_APPLICATION=$WERCKER_EB_DEPLOY_APP_NAME
@@ -44,8 +45,13 @@ export AWS_ENVIRONMENT=$WERCKER_EB_DEPLOY_ENV_NAME
 export AWS_DEFAULT_REGION=$WERCKER_EB_DEPLOY_REGION
 export AWS_CONFIG_FILE=$WERCKER_ROOT/.aws/config
 
+info 'git add...';
 git add .
 
+info 'eb init'
+eb init $WERCKER_EBDEPLOY_APPLICATION --quit
+
+info 'create .elasticbeanstalk/config.yml...';
 mkdir -p .elasticbeanstalk
 cat > .elasticbeanstalk/config.yml << EOF
 branch-defaults:
@@ -65,6 +71,7 @@ global:
 EOF
 exec 3>&1
 
+info 'eb deploy...';
 for((i=0; i < 10; i++)); do
   out=$(eb deploy $WERCKER_EBDEPLOY_ENVIRONMENT --timeout 9999 --nohang | tee >(cat - >&3))
   if [[ "$out" == *"invalid state"* ]]; then
