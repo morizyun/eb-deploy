@@ -34,10 +34,10 @@ info 'Installing pip ...'
 sudo apt-get update
 sudo apt-get install -y python-pip libpython-all-dev zip
 
-info 'Installing the AWS EB CLI ...';
-pip install --upgrade --user awsebcli
+info 'Installing the AWS CLI ...';
+pip install awscli;
 export PATH=~/.local/bin:$PATH
-eb --version
+aws --version
 
 info 'export set default values for AWS CLI tool ...';
 export AMAZON_ACCESS_KEY_ID=$WERCKER_EB_DEPLOY_ACCESS_KEY
@@ -48,7 +48,7 @@ export EB_DESCRIPTION=$WERCKER_EB_DEPLOY_ENV_NAME,$WERCKER_GIT_BRANCH
 export S3_FILE_KEY=$WERCKER_EB_DEPLOY_APP_NAME/$WERCKER_EB_DEPLOY_APP_NAME.$UNIXTIME.zip
 export AWS_CONFIG_FILE=$HOME/.aws/config
 
-info 'create .aws ...';
+info 'create .aws/config ...';
 mkdir -p $HOME/.aws
 echo '[default]' > $HOME/.aws/config
 echo 'output = json' >> $HOME/.aws/config
