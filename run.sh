@@ -57,6 +57,7 @@ echo "aws_access_key_id = $WERCKER_EB_DEPLOY_ACCESS_KEY" >> $HOME/.aws/config
 echo "aws_secret_access_key = $WERCKER_EB_DEPLOY_SECRET_KEY" >> $HOME/.aws/config
 
 info 'Compress source code ...'
+mkdir $WERCKER_EB_DEPLOY_APP_NAME
 git archive HEAD --output=$S3_FILE_KEY
 
 info 'copy code to S3 ...'
