@@ -1,5 +1,5 @@
 name: eb-deploy
-version: "0.0.5"
+version: "0.0.6"
 description: Deploy an application to an Elastic Beanstalk instance using AWS EB CLI
 keywords:
   - AWS

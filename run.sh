@@ -1,3 +1,4 @@
+export UNIXTIME=`date +%s`
 
 if [ ! -n "$WERCKER_EB_DEPLOY_ACCESS_KEY" ]; then
   error 'Please specify access_key'
@@ -19,65 +20,58 @@ if [ ! -n "$WERCKER_EB_DEPLOY_ENV_NAME" ]; then
   exit 1
 fi
 
-if [ ! -n "$WERCKER_EB_DEPLOY_REGION" ]; then
-  error 'Please specify region'
+if [ ! -n "$WERCKER_EB_DEPLOY_S3_BUCKET" ]; then
+  error 'Please specify s3 bucket'
   exit 1
 fi
 
-if [ ! -n "$WERCKER_EB_DEPLOY_PLATFORM" ]; then
-  export WERCKER_EB_DEPLOY_PLATFORM='64bit Amazon Linux 2016.03 v2.1.6 running Ruby 2.3 (Puma)'
+if [ ! -n "$WERCKER_EB_DEPLOY_REGION" ]; then
+  info 'set default region as ap-northeast-1'
+  export WERCKER_EB_DEPLOY_REGION="ap-northeast-1"
 fi
 
-info 'Installing pip...'
+info 'Installing pip ...'
 sudo apt-get update
 sudo apt-get install -y python-pip libpython-all-dev zip
 
-info 'Installing the AWS EB CLI...';
+info 'Installing the AWS EB CLI ...';
 pip install --upgrade --user awsebcli
 export PATH=~/.local/bin:$PATH
 eb --version
 
-info 'export ENV VAR...';
-export AWS_ACCESS_KEY_ID=$WERCKER_EB_DEPLOY_ACCESS_KEY
-export AWS_SECRET_ACCESS_KEY=$WERCKER_EB_DEPLOY_SECRET_KEY
-export AWS_APPLICATION=$WERCKER_EB_DEPLOY_APP_NAME
-export AWS_ENVIRONMENT=$WERCKER_EB_DEPLOY_ENV_NAME
+info 'export set default values for AWS CLI tool ...';
+export AMAZON_ACCESS_KEY_ID=$WERCKER_EB_DEPLOY_ACCESS_KEY
+export AMAZON_SECRET_ACCESS_KEY=$WERCKER_EB_DEPLOY_SECRET_KEY
 export AWS_DEFAULT_REGION=$WERCKER_EB_DEPLOY_REGION
-export AWS_CONFIG_FILE=$WERCKER_ROOT/.aws/config
+export EB_VERSION_LABEL=$WERCKER_EB_DEPLOY_APP_NAME.$UNIXTIME
+export EB_DESCRIPTION=$WERCKER_EB_DEPLOY_ENV_NAME,$WERCKER_GIT_BRANCH
+export S3_FILE_KEY=$WERCKER_EB_DEPLOY_APP_NAME/$WERCKER_EB_DEPLOY_APP_NAME.$UNIXTIME.zip
+export AWS_CONFIG_FILE=$HOME/.aws/config
 
-info 'git add...';
-git add .
+info 'create .aws ...';
+mkdir -p $HOME/.aws
+echo '[default]' > $HOME/.aws/config
+echo 'output = json' >> $HOME/.aws/config
+echo "region = $WERCKER_EB_DEPLOY_REGION" >> $HOME/.aws/config
+echo "aws_access_key_id = $WERCKER_EB_DEPLOY_ACCESS_KEY" >> $HOME/.aws/config
+echo "aws_secret_access_key = $WERCKER_EB_DEPLOY_SECRET_KEY" >> $HOME/.aws/config
 
-info 'eb init'
-eb init $WERCKER_EBDEPLOY_APPLICATION --quiet
+info 'Compress source code ...'
+git archive HEAD --output=$S3_FILE_KEY
 
-info 'create .elasticbeanstalk/config.yml...';
-mkdir -p .elasticbeanstalk
-cat > .elasticbeanstalk/config.yml << EOF
-branch-defaults:
-  ebextensions:
-    environment: $WERCKER_EBDEPLOY_ENVIRONMENT
-  master:
-    environment: $WERCKER_EBDEPLOY_ENVIRONMENT
-  seo_tags:
-    environment: $WERCKER_EBDEPLOY_ENVIRONMENT
-global:
-  application_name: $WERCKER_EBDEPLOY_APPLICATION
-  default_ec2_keyname: aws-eb.$WERCKER_EBDEPLOY_APPLICATION
-  default_platform: $WERCKER_EB_DEPLOY_PLATFORM
-  default_region: $WERCKER_EBDEPLOY_REGION
-  profile: eb-cli
-  sc: git
-EOF
-exec 3>&1
+info 'copy code to S3 ...'
+aws s3 cp --acl private $S3_FILE_KEY "s3://$WERCKER_EB_DEPLOY_S3_BUCKET/$S3_FILE_KEY"
 
-info 'eb deploy...';
-for((i=0; i < 10; i++)); do
-  out=$(eb deploy $WERCKER_EBDEPLOY_ENVIRONMENT --timeout 9999 --nohang | tee >(cat - >&3))
-  if [[ "$out" == *"invalid state"* ]]; then
-    echo "Retrying in 10 seconds..."
-	  sleep 10
-  else
-	  break
-  fi
-done
+info 'create elasticbeanstalk application-version ...'
+aws elasticbeanstalk create-application-version \
+    --region $WERCKER_EB_DEPLOY_REGION \
+    --application-name $WERCKER_EB_DEPLOY_APP_NAME \
+    --version-label $EB_VERSION_LABEL \
+    --description $EB_DESCRIPTION \
+    --source-bundle "{\"S3Bucket\":\"$WERCKER_EB_DEPLOY_S3_BUCKET\", \"S3Key\":\"$S3_FILE_KEY\"}"
+
+info 'update elasticbeanstalk application ...'
+aws elasticbeanstalk update-environment \
+    --environment-name $WERCKER_EB_DEPLOY_ENV_NAME \
+    --description $EB_DESCRIPTION,$WERCKER_GIT_COMMIT \
+    --version-label $EB_VERSION_LABEL
